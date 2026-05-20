@@ -12,10 +12,8 @@ jobs:
         include:
           - os: windows-latest
             artifact_name: image-agent-portable-windows
-            ext: .exe
           - os: macos-latest
             artifact_name: image-agent-portable-macos
-            ext: ""
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -36,12 +34,25 @@ jobs:
         run: |
           pyinstaller image_agent_portable.spec --distpath dist --workpath build --noconfirm
 
-      - name: Add launcher scripts
-        shell: bash
+      - name: Add launcher (macOS)
+        if: runner.os == 'macOS'
         run: |
           cd dist/image-agent-portable
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            cat > "运行.bat" << 'BATEOF'
+          chmod +x image-agent-portable
+          cat > run.command << 'EOF'
+          #!/bin/bash
+          cd "$(dirname "$0")"
+          echo "Starting server..."
+          sleep 1 && open http://localhost:8000 2>/dev/null &
+          ./image-agent-portable
+          EOF
+          chmod +x run.command
+
+      - name: Add launcher (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd dist/image-agent-portable
+          @"
           @echo off
           chcp 65001 >nul
           title Image Generation Agent
@@ -50,28 +61,19 @@ jobs:
           start "" http://localhost:8000
           image-agent-portable.exe
           pause
-          BATEOF
-          else
-            chmod +x image-agent-portable
-            cat > "run.command" << 'SHEOF'
-          #!/bin/bash
-          cd "$(dirname "$0")"
-          echo "Starting server..."
-          sleep 1 && open http://localhost:8000 2>/dev/null &
-          ./image-agent-portable
-          SHEOF
-            chmod +x run.command
-          fi
+          "@ | Out-File -FilePath "运行.bat" -Encoding utf8
 
-      - name: Package artifact
-        shell: bash
+      - name: Package artifact (macOS)
+        if: runner.os == 'macOS'
         run: |
           cd dist
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            7z a -tzip "${{ matrix.artifact_name }}.zip" image-agent-portable/
-          else
-            zip -r "${{ matrix.artifact_name }}.zip" image-agent-portable/
-          fi
+          zip -r "${{ matrix.artifact_name }}.zip" image-agent-portable/
+
+      - name: Package artifact (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd dist
+          Compress-Archive -Path image-agent-portable -DestinationPath "${{ matrix.artifact_name }}.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
