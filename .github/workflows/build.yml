@@ -32,7 +32,64 @@ jobs:
 
       - name: Build with PyInstaller
         run: |
-          pyinstaller image_agent_portable.spec --distpath dist --workpath build --noconfirm
+          pyinstaller app.py \
+            --onedir \
+            --console \
+            --name image-agent-portable \
+            --add-data "static/index.html:static" \
+            --hidden-import langgraph \
+            --hidden-import langgraph.graph \
+            --hidden-import langgraph.checkpoint.memory \
+            --hidden-import langchain \
+            --hidden-import langchain_core \
+            --hidden-import langchain_openai \
+            --hidden-import uvicorn.loops.auto \
+            --hidden-import uvicorn.protocols.http.auto \
+            --hidden-import uvicorn.lifespan.on \
+            --hidden-import starlette \
+            --hidden-import fastapi \
+            --hidden-import aiosqlite \
+            --hidden-import httpx \
+            --hidden-import aiofiles \
+            --hidden-import PIL \
+            --hidden-import tenacity \
+            --hidden-import multipart \
+            --hidden-import pydantic \
+            --hidden-import pydantic_settings \
+            --hidden-import services.sdxl \
+            --hidden-import services.anime \
+            --hidden-import services.doubao \
+            --hidden-import services.face3d \
+            --hidden-import services.glm \
+            --hidden-import services.hunyuan \
+            --hidden-import services.llm \
+            --hidden-import services.modelscope \
+            --hidden-import services.pollinations \
+            --hidden-import services.qianfan \
+            --hidden-import services.runninghub \
+            --hidden-import services.scorer \
+            --hidden-import services.spark \
+            --hidden-import services.stability \
+            --hidden-import services.wan26 \
+            --hidden-import nodes.prompt \
+            --hidden-import nodes.router \
+            --hidden-import nodes.generator \
+            --hidden-import nodes.critic \
+            --hidden-import nodes.decision \
+            --hidden-import config \
+            --hidden-import state \
+            --hidden-import stats \
+            --hidden-import db \
+            --hidden-import key_manager \
+            --hidden-import graph \
+            --exclude-module torch \
+            --exclude-module torchvision \
+            --exclude-module open_clip \
+            --exclude-module diffusers \
+            --exclude-module accelerate \
+            --exclude-module safetensors \
+            --exclude-module transformers \
+            --noconfirm
 
       - name: Add launcher (macOS)
         if: runner.os == 'macOS'
