@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>文生图智能体 · Image Generation Agent</title>
+
+<!-- Superhuman Design System — Inter Variable substituting Super Sans VF -->
+<style>
+/* ═══════════════════════════════════ Design Tokens ═══════════════════════════════════ */
+:root {
+  --color-primary: #1b1938; --color-primary-deep: #0e0c1f;
+  --color-surface-violet-soft: #c9b4fa;
+  --color-surface-teal-deep: #0e3030; --color-surface-teal-mid: #155555;
+  --color-canvas: #ffffff; --color-canvas-soft: #fafaf8;
+  --color-hairline: #e8e4dd; --color-hairline-dark: #3f3a52;
+  --color-ink: #292827; --color-ink-mute: #73706d; --color-ink-faint: #9a9794;
+  --color-on-primary: #ffffff;
+  --color-on-dark-mute: rgba(255,255,255,0.60);
+  --color-on-dark-faint: rgba(255,255,255,0.38);
+  --color-success: #2D8A6E; --color-warning: #D49530; --color-error: #D94A4A;
+  --font-sans: 'Inter Variable', 'Inter', -apple-system, system-ui, 'Segoe UI', Helvetica, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --rounded-xs: 4px; --rounded-sm: 6px; --rounded-md: 8px; --rounded-lg: 12px; --rounded-xl: 16px; --rounded-full: 9999px;
+  --space-xxs: 2px; --space-xs: 4px; --space-sm: 8px; --space-md: 12px; --space-lg: 16px; --space-xl: 24px; --space-xxl: 32px; --space-huge: 64px;
+  --shadow-0: none; --shadow-1: 0 1px 3px rgba(0,0,0,0.08); --shadow-2: 0 8px 24px rgba(0,0,0,0.12);
+  --container-max: 1100px; --container-gutter: 32px; --nav-height: 64px;
+  --ease-out: 0.18s ease-out; --ease-in-out: 0.22s ease-in-out;
+}
+
+/* ═══════════════════════════════════ Reset & Base ═══════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans); font-size: 16px; font-weight: 460; line-height: 1.5;
+  color: var(--color-ink); background: var(--color-canvas);
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+}
+a { color: var(--color-ink); text-decoration: underline; text-underline-offset: 3px; }
+a:hover { color: var(--color-primary); }
+img { max-width: 100%; display: block; }
+button { font-family: inherit; cursor: pointer; }
+input, textarea, select { font-family: inherit; }
+
+/* Typography Scale */
+.display-xl { font-size: 48px; font-weight: 460; line-height: 0.96; letter-spacing: -1.32px; }
+.display-lg { font-size: 28px; font-weight: 540; line-height: 1.14; letter-spacing: -0.63px; }
+.heading-lg { font-size: 20px; font-weight: 460; line-height: 1.2; letter-spacing: -0.4px; }
+.body-lg { font-size: 18px; font-weight: 540; line-height: 1.5; letter-spacing: -0.135px; }
+.body-md { font-size: 16px; font-weight: 460; line-height: 1.5; }
+.button-label { font-size: 16px; font-weight: 700; line-height: 1.0; }
+.button-cap { font-size: 14px; font-weight: 600; line-height: 1.0; }
+.caption { font-size: 14px; font-weight: 460; line-height: 1.4; color: var(--color-ink-mute); }
+.micro { font-size: 12px; font-weight: 540; line-height: 1.4; }
+
+.container { max-width: var(--container-max); margin: 0 auto; padding: 0 var(--container-gutter); }
+
+/* ═══════════════════════════════════ Top Navigation ═══════════════════════════════════ */
+.top-nav {
+  position: sticky; top: 0; z-index: 100; height: var(--nav-height);
+  display: flex; align-items: center;
+  transition: background var(--ease-out), border-color var(--ease-out);
+}
+.top-nav.dark { background: var(--color-primary); border-bottom: 1px solid var(--color-hairline-dark); }
+.top-nav.light { background: var(--color-canvas); border-bottom: 1px solid var(--color-hairline); }
+.top-nav .container { display: flex; align-items: center; width: 100%; gap: 32px; }
+.nav-logo { font-size: 22px; font-weight: 600; letter-spacing: -0.5px; flex-shrink: 0; text-decoration: none; }
+.top-nav.dark .nav-logo { color: var(--color-on-primary); }
+.top-nav.light .nav-logo { color: var(--color-primary); }
+.nav-links { display: flex; gap: 4px; flex: 1; }
+.nav-link {
+  padding: 8px 14px; border-radius: var(--rounded-md); font-size: 14px; font-weight: 460;
+  line-height: 1.0; border: none; transition: color var(--ease-out), background var(--ease-out);
+  white-space: nowrap; text-decoration: none; background: transparent;
+}
+.top-nav.dark .nav-link { color: var(--color-on-dark-mute); }
+.top-nav.light .nav-link { color: var(--color-ink-mute); }
+.nav-link:hover { color: var(--color-on-primary); background: rgba(255,255,255,0.08); }
+.top-nav.light .nav-link:hover { color: var(--color-ink); background: var(--color-canvas-soft); }
+.nav-link.active { color: var(--color-on-primary); background: rgba(255,255,255,0.10); font-weight: 540; }
+.top-nav.light .nav-link.active { color: var(--color-primary); background: var(--color-canvas-soft); }
+.nav-actions { display: flex; gap: 12px; align-items: center; flex-shrink: 0; }
+.nav-hamburger { display: none; width: 36px; height: 36px; align-items: center; justify-content: center; background: transparent; border: 1px solid var(--color-hairline-dark); border-radius: var(--rounded-sm); font-size: 20px; }
+.top-nav.dark .nav-hamburger { color: var(--color-on-primary); border-color: var(--color-hairline-dark); }
+.top-nav.light .nav-hamburger { color: var(--color-ink); border-color: var(--color-hairline); }
+
+/* ═══════════════════════════════════ Buttons ═══════════════════════════════════ */
+.btn-primary-dark {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--color-primary); color: var(--color-on-primary);
+  font-size: 16px; font-weight: 700; line-height: 1.0; padding: 12px 20px;
+  border-radius: var(--rounded-md); border: none; transition: background var(--ease-out);
+  white-space: nowrap; height: 44px; text-decoration: none;
+}
+.btn-primary-dark:hover { background: var(--color-primary-deep); }
+.btn-primary-dark:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-on-dark-pill {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--color-surface-violet-soft); color: var(--color-primary);
+  font-size: 16px; font-weight: 700; line-height: 1.0; padding: 12px 28px;
+  border-radius: var(--rounded-full); border: none;
+  transition: background var(--ease-out), box-shadow var(--ease-out);
+  white-space: nowrap; height: 44px; text-decoration: none;
+}
+.btn-on-dark-pill:hover { background: #ddd0ff; box-shadow: 0 0 24px rgba(201,180,250,0.25); }
+.btn-on-dark-pill:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-secondary-outline {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--color-canvas); color: var(--color-ink);
+  font-size: 16px; font-weight: 700; line-height: 1.0; padding: 12px 20px;
+  border-radius: var(--rounded-md); border: 1px solid var(--color-hairline-dark);
+  transition: border-color var(--ease-out), background var(--ease-out);
+  white-space: nowrap; height: 44px;
+}
+.btn-secondary-outline:hover { border-color: var(--color-primary); background: var(--color-canvas-soft); }
+.btn-on-teal {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--color-canvas); color: var(--color-surface-teal-deep);
+  font-size: 16px; font-weight: 700; line-height: 1.0; padding: 12px 20px;
+  border-radius: var(--rounded-md); border: none; transition: opacity var(--ease-out);
+  white-space: nowrap; height: 44px; text-decoration: none;
+}
+.btn-on-teal:hover { opacity: 0.88; }
+.btn-ghost {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  background: transparent; color: var(--color-ink); font-size: 14px; font-weight: 600;
+  line-height: 1.0; padding: 8px 12px; border-radius: var(--rounded-sm); border: none;
+  transition: background var(--ease-out); white-space: nowrap; height: 36px;
+}
+.btn-ghost:hover { background: var(--color-canvas-soft); }
+.top-nav.dark .btn-ghost { color: var(--color-on-dark-mute); }
+.top-nav.dark .btn-ghost:hover { color: var(--color-on-primary); background: rgba(255,255,255,0.08); }
+.btn-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: var(--rounded-full);
+  background: transparent; color: var(--color-ink-mute); border: none;
+  font-size: 16px; transition: color var(--ease-out), background var(--ease-out);
+}
+.btn-icon:hover { color: var(--color-error); background: rgba(217,74,74,0.08); }
+.btn-sm { height: 36px; font-size: 14px; padding: 8px 16px; }
+
+/* ═══════════════════════════════════ Hero Band ═══════════════════════════════════ */
+.hero-band {
+  background: var(--color-primary); position: relative; overflow: hidden;
+  padding: 96px 0 80px; text-align: center;
+}
+.hero-band::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 800px 500px at 70% 20%, rgba(139,92,246,0.18) 0%, transparent 60%),
+    radial-gradient(ellipse 600px 400px at 30% 80%, rgba(56,189,248,0.10) 0%, transparent 60%),
+    radial-gradient(ellipse 500px 500px at 60% 60%, rgba(201,180,250,0.08) 0%, transparent 50%);
+}
+.hero-title { font-size: clamp(36px, 6vw, 64px); font-weight: 540; line-height: 0.96; color: var(--color-on-primary); position: relative; z-index: 1; }
+.hero-subtitle { font-size: 18px; font-weight: 460; line-height: 1.5; color: var(--color-on-dark-mute); margin-top: var(--space-lg); max-width: 520px; margin-left: auto; margin-right: auto; position: relative; z-index: 1; }
+.hero-actions { margin-top: var(--space-xxl); display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; position: relative; z-index: 1; }
+.hero-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.08); color: var(--color-on-dark-mute); font-size: 12px; font-weight: 540; line-height: 1.4; padding: 6px 14px; border-radius: var(--rounded-full); border: 1px solid rgba(255,255,255,0.10); margin-bottom: var(--space-xl); position: relative; z-index: 1; }
+
+/* ═══════════════════════════════════ Sections & Cards ═══════════════════════════════════ */
+.section { padding: var(--space-huge) 0; }
+.section-soft { background: var(--color-canvas-soft); }
+.section-header { text-align: center; margin-bottom: var(--space-xxl); }
+.section-header h2 { font-size: clamp(28px, 4vw, 48px); font-weight: 460; line-height: 0.96; letter-spacing: -1.32px; color: var(--color-ink); }
+.section-header p { font-size: 18px; font-weight: 540; line-height: 1.5; letter-spacing: -0.135px; color: var(--color-ink-mute); margin-top: var(--space-md); max-width: 520px; margin-left: auto; margin-right: auto; }
+.card-feature-light { background: var(--color-canvas); padding: var(--space-xxl); border-radius: var(--rounded-lg); border: 1px solid var(--color-hairline); }
+.card-feature-soft { background: var(--color-canvas-soft); padding: var(--space-xl); border-radius: var(--rounded-md); }
+.card-teal-band { background: var(--color-surface-teal-deep); color: var(--color-on-primary); padding: var(--space-huge) var(--space-xxl); border-radius: var(--rounded-lg); text-align: center; }
+.card-teal-band h3 { font-size: 28px; font-weight: 540; line-height: 1.14; letter-spacing: -0.63px; margin-bottom: var(--space-xl); }
+
+/* ═══════════════════════════════════ Inputs ═══════════════════════════════════ */
+.text-input {
+  background: var(--color-canvas); color: var(--color-ink); border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-sm); padding: 10px 12px; height: 44px; font-size: 16px;
+  font-weight: 460; outline: none; transition: border-color var(--ease-out), box-shadow var(--ease-out);
+}
+.text-input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(27,25,56,0.10); }
+.text-input::placeholder { color: var(--color-ink-faint); }
+textarea.text-input { height: auto; resize: vertical; padding: 12px; line-height: 1.5; min-height: 100px; }
+select.text-input { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2373706d' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 32px; }
+select.text-input option { background: var(--color-canvas); color: var(--color-ink); }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group label { font-size: 12px; font-weight: 540; line-height: 1.4; color: var(--color-ink-mute); text-transform: uppercase; letter-spacing: 0.3px; }
+.input-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.input-row .form-group:first-child { flex: 1; min-width: 240px; }
+.prompt-textarea { min-height: 120px; font-size: 16px; font-weight: 460; }
+
+/* ═══════════════════════════════════ Status & Badges ═══════════════════════════════════ */
+.status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.status-dot.idle { background: var(--color-ink-faint); }
+.status-dot.running { background: var(--color-warning); animation: pulse 1s infinite; }
+.status-dot.done { background: var(--color-success); }
+.status-dot.error { background: var(--color-error); }
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.3;} }
+.status-bar { display: flex; align-items: center; gap: 10px; margin-top: var(--space-md); padding: 10px 14px; border-radius: var(--rounded-sm); background: var(--color-canvas-soft); border: 1px solid var(--color-hairline); font-size: 14px; font-weight: 460; color: var(--color-ink-mute); min-height: 40px; }
+.badge-tag { display: inline-flex; align-items: center; font-size: 12px; font-weight: 540; line-height: 1.4; border-radius: var(--rounded-xs); padding: 2px 8px; }
+.badge-tag-indigo { background: rgba(27,25,56,0.08); color: var(--color-primary); }
+.badge-tag-teal { background: rgba(14,48,48,0.08); color: var(--color-surface-teal-deep); }
+.badge-tag-warm { background: rgba(212,149,48,0.10); color: var(--color-warning); }
+.badge-best { display: inline-flex; align-items: center; gap: 4px; background: rgba(45,138,110,0.10); color: var(--color-success); font-size: 12px; font-weight: 600; line-height: 1.4; border-radius: var(--rounded-full); padding: 4px 10px; }
+
+/* ═══════════════════════════════════ Image Grid ═══════════════════════════════════ */
+.image-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+.image-card { background: var(--color-canvas); border: 1px solid var(--color-hairline); border-radius: var(--rounded-lg); overflow: hidden; transition: border-color var(--ease-out), box-shadow var(--ease-out); }
+.image-card:hover { border-color: var(--color-primary); box-shadow: var(--shadow-1); }
+.image-card:hover .btn-icon { opacity: 1 !important; }
+.image-card.best { border-color: var(--color-success); box-shadow: 0 0 0 1px rgba(45,138,110,0.25), var(--shadow-1); }
+.image-card img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: var(--color-canvas-soft); }
+.image-card .meta { padding: 14px 16px; font-size: 13px; font-weight: 460; color: var(--color-ink-mute); display: flex; flex-direction: column; gap: 4px; }
+.image-card .meta .score { font-weight: 700; font-size: 18px; }
+.score-high { color: var(--color-success); }
+.score-mid { color: var(--color-warning); }
+.score-low { color: var(--color-error); }
+
+/* ═══════════════════════════════════ Route Chips, Score Bars, Logs ═══════════════════════════════════ */
+.route-chips { display: flex; gap: 12px; flex-wrap: wrap; }
+.route-chip { background: var(--color-canvas-soft); border: 1px solid var(--color-hairline); border-radius: var(--rounded-md); padding: 12px 16px; font-size: 14px; font-weight: 460; line-height: 1.5; }
+.route-chip strong { color: var(--color-primary); font-weight: 600; }
+.score-item { margin-bottom: 18px; padding-bottom: 18px; border-bottom: 1px solid var(--color-hairline); }
+.score-item:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+.score-bar-row { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+.score-bar { height: 5px; border-radius: 3px; background: var(--color-hairline); overflow: hidden; flex: 1; }
+.score-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s var(--ease-in-out); }
+.score-bar-fill.clip { background: var(--color-primary); }
+.score-bar-fill.aesthetic { background: #c9b4fa; }
+.score-bar-fill.gpt { background: var(--color-surface-teal-mid); }
+.logs { max-height: 320px; overflow-y: auto; font-family: var(--font-mono); font-size: 13px; font-weight: 460; line-height: 1.7; padding: var(--space-sm) 0; }
+.log-line { color: var(--color-ink-mute); padding: 2px 0; }
+.log-line.node { color: var(--color-primary); font-weight: 600; }
+.log-line.score { color: var(--color-success); }
+.log-line.retry { color: var(--color-warning); }
+.log-line.error { color: var(--color-error); }
+.grid-2-wide { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-xl); }
+
+/* ═══════════════════════════════════ Slide-over Panels ═══════════════════════════════════ */
+.slide-panel { position: fixed; top: var(--nav-height); bottom: 0; z-index: 90; background: var(--color-canvas); border: 1px solid var(--color-hairline); display: flex; flex-direction: column; overflow: hidden; transition: transform var(--ease-in-out); }
+.slide-panel-left { left: 0; width: 320px; border-right: 1px solid var(--color-hairline); transform: translateX(-100%); }
+.slide-panel-left.open { transform: translateX(0); }
+.slide-panel-right { right: 0; width: 360px; border-left: 1px solid var(--color-hairline); transform: translateX(100%); }
+.slide-panel-right.open { transform: translateX(0); }
+.panel-header { padding: 18px 20px; font-size: 16px; font-weight: 700; line-height: 1.0; border-bottom: 1px solid var(--color-hairline); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+.panel-body { flex: 1; overflow-y: auto; padding: 4px 0; }
+.task-slot { display: flex; flex-direction: column; gap: 0; padding: 10px 16px; flex-shrink: 0; position: relative; border-bottom: 1px solid var(--color-hairline); }
+.task-slot-input { flex: 1; background: var(--color-canvas-soft); border: 1px solid var(--color-hairline); border-radius: var(--rounded-sm); padding: 8px 10px; color: var(--color-ink); font-size: 14px; font-weight: 460; outline: none; resize: none; line-height: 1.5; }
+.task-slot-input:focus { border-color: var(--color-primary); }
+.slot-info { font-size: 12px; font-weight: 460; color: var(--color-ink-mute); line-height: 1.4; }
+.task-item { padding: 14px 18px; cursor: pointer; border-bottom: 1px solid var(--color-hairline); transition: background var(--ease-out); display: flex; gap: 12px; align-items: flex-start; }
+.task-item:hover { background: var(--color-canvas-soft); }
+.task-item.selected { background: rgba(27,25,56,0.04); border-left: 3px solid var(--color-primary); padding-left: 15px; }
+.task-item:hover .task-item-del { opacity: 0.6 !important; }
+.task-item .task-item-del:hover { opacity: 1 !important; color: var(--color-error); }
+.task-status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+.task-status-dot.pending { background: var(--color-ink-faint); }
+.task-status-dot.running { background: var(--color-warning); animation: pulse 1s infinite; }
+.task-status-dot.completed { background: var(--color-success); }
+.task-status-dot.failed { background: var(--color-error); }
+.task-item-body { flex: 1; min-width: 0; }
+.task-item-prompt { font-size: 14px; font-weight: 460; line-height: 1.4; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+.task-item-thumb { width: 46px; height: 46px; border-radius: var(--rounded-sm); object-fit: cover; background: var(--color-canvas-soft); flex-shrink: 0; }
+.task-item-meta { font-size: 12px; font-weight: 460; color: var(--color-ink-mute); line-height: 1.4; }
+.task-item-score { font-weight: 700; font-size: 14px; }
+
+/* ═══════════════════════════════════ Section Page, Pill Tabs, Feature Row, Hints ═══════════════════════════════════ */
+.section-page { display: none; }
+.section-page.active { display: block; }
+.pill-tab-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.pill-tab { background: var(--color-canvas); color: var(--color-ink); font-size: 14px; font-weight: 600; line-height: 1.0; padding: 8px 16px; border-radius: var(--rounded-full); border: 1px solid var(--color-hairline); transition: border-color var(--ease-out), background var(--ease-out); }
+.pill-tab:hover { border-color: var(--color-primary); }
+.pill-tab.active { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-primary); }
+.feature-row { background: var(--color-canvas-soft); color: var(--color-ink); padding: var(--space-xl); border-radius: var(--rounded-md); border: 1px solid var(--color-hairline); }
+.hint { font-size: 14px; font-weight: 460; line-height: 1.4; color: var(--color-ink-mute); margin-bottom: 12px; }
+.hint a { color: var(--color-primary); text-decoration: underline; }
+
+/* Gallery grid */
+.gallery-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-md); }
+.gallery-grid .image-card.selected { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-surface-violet-soft); }
+.stats-table { width: 100%; border-collapse: collapse; font-size: 14px; font-weight: 460; }
+.stats-table thead tr { border-bottom: 1px solid var(--color-hairline); text-align: left; color: var(--color-ink-mute); font-size: 12px; font-weight: 540; }
+.stats-table th { padding: 10px 14px; }
+.stats-table td { padding: 10px 14px; border-bottom: 1px solid var(--color-hairline); font-variant-numeric: tabular-nums; }
+.model-chip { background: var(--color-canvas-soft); border: 1px solid var(--color-hairline); border-radius: var(--rounded-xs); padding: 2px 8px; font-size: 12px; font-weight: 540; }
+
+/* ═══════════════════════════════════ Responsive ═══════════════════════════════════ */
+@media (max-width: 1279px) { .hero-title { font-size: clamp(32px, 5vw, 56px); } }
+@media (max-width: 1023px) {
+  .grid-2-wide { grid-template-columns: 1fr; }
+  .hero-title { font-size: 48px; }
+  .nav-links { display: none; }
+  .nav-links.open { display: flex; flex-direction: column; gap: 0; position: absolute; top: var(--nav-height); left: 0; right: 0; background: var(--color-primary); border-bottom: 1px solid var(--color-hairline-dark); padding: var(--space-xs); box-shadow: var(--shadow-2); }
+  .top-nav.light .nav-links.open { background: var(--color-canvas); border-color: var(--color-hairline); }
+  .nav-links.open .nav-link { border-radius: 0; padding: 12px 16px; }
+  .nav-hamburger { display: flex; }
+  .slide-panel-left { width: 280px; }
+  .slide-panel-right { width: 320px; }
+  .gallery-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 767px) {
+  .hero-band { padding: 64px 0 48px; }
+  .hero-title { font-size: 36px; }
+  .hero-subtitle { font-size: 16px; }
+  .image-grid { grid-template-columns: 1fr; }
+  .input-row { flex-direction: column; }
+  .input-row .form-group { width: 100%; }
+  .input-row .form-group:first-child { min-width: 0; }
+  .slide-panel-left, .slide-panel-right { width: 100%; }
+  .container { padding: 0 16px; }
+  .nav-actions .btn-ghost { display: none; }
+  .section { padding: var(--space-xxl) 0; }
+  .card-teal-band { padding: var(--space-xxl) var(--space-xl); }
+  .gallery-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 479px) {
+  .hero-title { font-size: 28px; }
+  .hero-actions { flex-direction: column; align-items: stretch; }
+  .hero-actions .btn-on-dark-pill { width: 100%; justify-content: center; }
+}
+</style>
+</head>
+<body>
+
+<!-- ════════════ Top Navigation ════════════ -->
+<nav class="top-nav dark" id="topNav">
+  <div class="container">
+    <a href="/" class="nav-logo" onclick="switchMode('agent');return false">HY</a>
+    <div class="nav-links" id="navLinks">
+      <button class="nav-link active" data-mode="agent" onclick="switchMode('agent')">Agent 全流程</button>
+      <button class="nav-link" data-mode="direct" onclick="switchMode('direct')">自由模型</button>
+      <button class="nav-link" data-mode="stats" onclick="switchMode('stats')">数据看板</button>
+      <button class="nav-link" data-mode="gallery" onclick="switchMode('gallery')">素材库</button>
+      <button class="nav-link" data-mode="settings" onclick="switchMode('settings')">设置</button>
+    </div>
+    <div class="nav-actions">
+      <button class="btn-ghost" id="toggleTaskPanel" onclick="toggleTaskPanel()" title="任务队列">队列</button>
+      <button class="btn-ghost" id="toggleHistory" onclick="toggleHistory()" title="生成历史" style="display:none">历史</button>
+      <button class="btn-on-dark-pill" id="navGenerateBtn" onclick="triggerGenerate()">开始生成</button>
+      <button class="nav-hamburger" id="navHamburger" onclick="toggleNav()">&#9776;</button>
+    </div>
+  </div>
+</nav>
+
+<!-- ════════════ Task Queue Panel (left slide-over) ════════════ -->
+<aside class="slide-panel slide-panel-left" id="taskInputPanel">
+  <div class="panel-header">
+    <span>提示词任务队列</span>
+    <button class="btn-icon" onclick="addPromptSlot()" title="新增" style="width:28px;height:28px;font-size:18px;color:var(--color-primary);border:2px solid var(--color-primary);border-radius:50%;">+</button>
+  </div>
+  <div class="panel-body" id="taskSlots">
+    <div class="task-slot">
+      <textarea class="task-slot-input" placeholder="输入 Prompt 后按 Enter 新增..." rows="2"></textarea>
+      <button class="btn-icon" onclick="this.parentElement.remove()" title="删除" style="margin-top:4px">&times;</button>
+    </div>
+  </div>
+  <div style="padding:14px 18px;flex-shrink:0;">
+    <button class="btn-primary-dark" id="submitQueueBtn" onclick="submitAllPrompts()" style="width:100%;height:36px;font-size:14px">提交全部到后台</button>
+  </div>
+</aside>
+
+<!-- ════════════ Task History Panel (right slide-over) ════════════ -->
+<aside class="slide-panel slide-panel-right" id="taskHistory">
+  <div class="panel-header">
+    <span>生成历史</span>
+    <span style="font-size:12px;font-weight:460;color:var(--color-ink-mute)" id="taskCount">0 个任务</span>
+  </div>
+  <div class="panel-body" id="taskList"></div>
+</aside>
+
+<!-- ════════════ Hero Band ════════════ -->
+<section class="hero-band" id="heroBand">
+  <div class="container">
+    <div class="hero-badge" id="heroBadge">AI 驱动的文生图流水线</div>
+    <h1 class="hero-title" id="heroTitle">文生图智能体</h1>
+    <p class="hero-subtitle" id="heroSubtitle">提示词增强、智能路由、多模型并行生成、自动评分优化 — 一站式出图。</p>
+    <div class="hero-actions" id="heroActions">
+      <button class="btn-on-dark-pill" onclick="generateAgent()">开始生成</button>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════ AGENT MODE ════════════ -->
+<div class="section-page active" id="section-agent">
+  <section class="section">
+    <div class="container">
+      <div class="card-feature-light">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:var(--space-xl)">
+          <span class="badge-tag badge-tag-indigo">Agent 全流程</span>
+          <span class="caption">增强 → 路由 → 生成 → 评分 → 迭代</span>
+        </div>
+        <div class="form-group" style="margin-bottom:var(--space-lg)">
+          <label>描述你想生成的画面</label>
+          <textarea class="text-input prompt-textarea" id="promptInput" placeholder="用自然语言描述画面...&#10;例如：赛博朋克武士站在雨夜的东京小巷中，霓虹灯光映照在湿漉漉的街道上"></textarea>
+        </div>
+        <div class="input-row" style="margin-bottom:var(--space-lg);align-items:flex-end">
+          <div class="form-group"><label>画面比例</label><select class="text-input" id="aspectRatio"><option value="1:1">1:1 方形</option><option value="16:9">16:9 宽屏</option><option value="4:3">4:3</option><option value="9:16">9:16 竖屏</option></select></div>
+          <div class="form-group"><label>分辨率</label><select class="text-input" id="resolution"><option value="512">512px</option><option value="768">768px</option><option value="1024" selected>1024px</option><option value="1536">1536px</option></select></div>
+          <div class="form-group">
+            <label>AI 评分</label>
+            <button class="pill-tab active" id="scoringBtn" onclick="toggleScoring()" style="height:44px;font-size:16px;font-weight:700;padding:12px 20px">已开启</button>
+          </div>
+          <div id="scoringOptions" style="display:flex;gap:12px;align-items:flex-end">
+            <div class="form-group"><label>及格线</label><input class="text-input" id="thresholdInput" type="number" value="0.80" min="0" max="1" step="0.05" style="width:80px"></div>
+            <div class="form-group"><label>最大重试</label><input class="text-input" id="maxRetriesInput" type="number" value="3" min="1" max="5" style="width:80px"></div>
+          </div>
+          <button class="btn-primary-dark" id="generateBtn" onclick="generateAgent()">开始生成</button>
+        </div>
+        <div class="status-bar"><span class="status-dot idle" id="statusDotAgent"></span><span id="statusTextAgent">就绪，等待输入</span></div>
+      </div>
+    </div>
+  </section>
+  <section class="section section-soft" id="resultsAgent" style="display:none">
+    <div class="container">
+      <div class="grid-2-wide" style="margin-bottom:var(--space-lg)">
+        <div class="card-feature-light" style="grid-row:span 2">
+          <div style="padding:0 0 18px 0;border-bottom:1px solid var(--color-hairline);margin-bottom:18px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:16px;font-weight:700">生成结果 <span id="roundLabel" style="font-weight:460;color:var(--color-ink-mute)"></span></span>
+            <span class="badge-best" id="bestBadge" style="display:none">最高：<span id="bestScoreLabel"></span></span>
+          </div>
+          <div class="image-grid" id="imageGridAgent"></div>
+        </div>
+        <div class="card-feature-light">
+          <div style="padding:0 0 18px 0;border-bottom:1px solid var(--color-hairline);margin-bottom:18px;font-size:16px;font-weight:700">模型连通状态</div>
+          <div id="modelStatus" style="display:flex;gap:16px;flex-wrap:wrap"></div>
+        </div>
+        <div class="card-feature-light">
+          <div style="padding:0 0 18px 0;border-bottom:1px solid var(--color-hairline);margin-bottom:18px;font-size:16px;font-weight:700">模型路由</div>
+          <div class="route-chips" id="routeInfo"></div>
+        </div>
+        <div class="card-feature-light">
+          <div style="padding:0 0 18px 0;border-bottom:1px solid var(--color-hairline);margin-bottom:18px;font-size:16px;font-weight:700">评分明细</div>
+          <div id="scoreBreakdown"></div>
+        </div>
+      </div>
+      <div class="card-feature-light">
+        <div style="padding:0 0 18px 0;border-bottom:1px solid var(--color-hairline);margin-bottom:12px;font-size:16px;font-weight:700">流水日志</div>
+        <div class="logs" id="logContainer"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ════════════ DIRECT MODE ════════════ -->
+<div class="section-page" id="section-direct">
+  <section class="section">
+    <div class="container">
+      <div class="section-header"><h2>自由模型生成</h2><p>自选模型，直接出图 — 跳过 Agent 流水线，快速尝试不同模型效果。</p></div>
+      <div class="card-feature-light">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:var(--space-xl)"><span class="badge-tag badge-tag-indigo">自由模式</span><span class="caption">20+ 模型可选</span></div>
+        <div class="input-row" style="margin-bottom:var(--space-md)">
+          <div class="form-group" style="flex:2;min-width:280px"><label>描述画面</label><textarea class="text-input prompt-textarea" id="promptDirect" placeholder="输入 Prompt，自选模型直接出图..."></textarea></div>
+          <div class="form-group" style="flex:1;min-width:180px"><label>选择模型</label>
+            <select class="text-input" id="modelSelect" onchange="onModelChange('Direct')">
+              <option value="sdxl">SDXL</option><option value="flux">Flux</option>
+              <option value="sdxl-anime">SDXL-Anime</option>
+              <option value="modelscope-flux">ModelScope FLUX.2-dev</option>
+              <option value="modelscope-sdxl">ModelScope SDXL</option>
+              <option value="doubao-seedream">豆包 Seedream 5.0</option>
+              <option value="wan2.6-image">WAN2.6 Image</option>
+              <option value="hy-image-v3.0">混元 Image v3.0</option>
+              <option value="modelscope">ModelScope Qwen-Image</option>
+              <option value="modelscope-zimage">ModelScope Z-Image-Turbo</option>
+              <option value="modelscope-nexus">ModelScope Nexus-Gen</option>
+              <option value="stable-ultra">Stable Image Ultra</option>
+              <option value="glm-image">GLM-Image</option><option value="cogview-4">CogView-4</option>
+              <option value="flux2-klein">Flux2-Klein 9B</option><option value="face3d">Face3D</option>
+              <option value="pollinations-sana">Pollinations Sana</option>
+              <option value="pollinations-gptimage">Pollinations GPT-Image</option>
+              <option value="pollinations-seedream5">Pollinations Seedream5</option>
+              <option value="pollinations-nanobanana">Pollinations NanoBanana</option>
+              <option value="pollinations-grok">Pollinations Grok-Imagine</option>
+              <option value="spark-tti">讯飞星火 TTI</option>
+              <option value="qianfan-qwen">千帆 Qwen-Image</option>
+            </select>
+          </div>
+        </div>
+        <div class="input-row" style="margin-bottom:var(--space-lg)">
+          <div class="form-group"><label>比例</label><select class="text-input" id="aspectRatioDirect"><option value="1:1">1:1</option><option value="16:9">16:9</option><option value="4:3">4:3</option><option value="9:16">9:16</option></select></div>
+          <div class="form-group"><label>分辨率</label><select class="text-input" id="resolutionDirect"><option value="512">512px</option><option value="768">768px</option><option value="1024" selected>1024px</option><option value="1536">1536px</option></select></div>
+          <div class="form-group"><label>数量</label><input class="text-input" id="numImagesDirect" type="number" value="4" min="1" max="8" style="width:72px"></div>
+          <div class="form-group"><label>增强</label><select class="text-input" id="enhanceDirect"><option value="0">否</option><option value="1">是</option></select></div>
+          <button class="btn-primary-dark" id="generateBtnDirect" onclick="generateDirect()">直接生成</button>
+        </div>
+        <div class="status-bar"><span class="status-dot idle" id="statusDotDirect"></span><span id="statusTextDirect">就绪，选择模型后点击生成</span></div>
+      </div>
+      <div id="resultsDirect" style="display:none;margin-top:var(--space-lg)"><div class="card-feature-light"><div style="padding:0 0 18px 0;border-bottom:1px solid var(--color-hairline);margin-bottom:18px;display:flex;justify-content:space-between"><span style="font-size:16px;font-weight:700">生成结果</span><span style="font-size:13px;color:var(--color-ink-mute)" id="directMeta"></span></div><div class="image-grid" id="imageGridDirect"></div></div></div>
+    </div>
+  </section>
+</div>
+
+<!-- ════════════ STATS MODE ════════════ -->
+<div class="section-page" id="section-stats">
+  <section class="section">
+    <div class="container">
+      <div class="section-header"><h2>模型使用统计</h2><p>每日各模型生图用量一览。</p></div>
+      <div class="card-feature-light">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-lg)">
+          <span class="badge-tag badge-tag-indigo" id="statsSummary">加载中...</span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="stats-table" id="statsTable"><thead><tr><th>日期</th><th>模型</th><th style="text-align:right;">生成张数</th></tr></thead><tbody id="statsTableBody"></tbody></table>
+        </div>
+        <div id="statsEmpty" style="text-align:center;padding:var(--space-xxl);color:var(--color-ink-mute);display:none;">暂无数据，生成图片后将自动记录</div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ════════════ GALLERY MODE ════════════ -->
+<div class="section-page" id="section-gallery">
+  <section class="section">
+    <div class="container">
+      <div class="section-header"><h2>素材库</h2><p>浏览生成历史、按模型筛选、一键导出打包。</p></div>
+      <div class="card-feature-light" style="margin-bottom:var(--space-lg)">
+        <div class="input-row">
+          <div class="form-group"><label>模型</label><select class="text-input" id="galleryModelFilter" onchange="fetchGenerations()"><option value="">全部</option></select></div>
+          <div class="form-group"><label>类别</label><select class="text-input" id="galleryCategoryFilter" onchange="fetchGenerations()"><option value="">全部</option></select></div>
+          <div class="form-group"><label>来源</label><select class="text-input" id="gallerySourceFilter" onchange="fetchGenerations()"><option value="">全部</option><option value="agent">Agent</option><option value="direct">自由</option></select></div>
+          <button class="btn-secondary-outline btn-sm" onclick="toggleSelectMode()" id="selectModeBtn">选择模式</button>
+          <button class="btn-secondary-outline btn-sm" onclick="selectAllVisible()" id="selectAllBtn" style="display:none;">全选</button>
+          <button class="btn-primary-dark btn-sm" onclick="exportSelected()" id="exportBtn" style="display:none;">导出选中</button>
+          <span class="caption" id="galleryCount"></span>
+        </div>
+      </div>
+      <div class="gallery-grid" id="galleryGrid"></div>
+      <div style="display:flex;justify-content:center;align-items:center;gap:var(--space-md);margin-top:var(--space-lg);">
+        <button class="btn-secondary-outline btn-sm" onclick="galleryPage(-1)" id="galleryPrev">上一页</button>
+        <span class="caption" id="galleryPageInfo"></span>
+        <button class="btn-secondary-outline btn-sm" onclick="galleryPage(1)" id="galleryNext">下一页</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ════════════ SETTINGS MODE ════════════ -->
+<div class="section-page" id="section-settings">
+  <section class="section">
+    <div class="container">
+      <div class="section-header"><h2>API Key 设置</h2><p>填入各模型的 API Key，保存后立即生效，覆盖环境变量。</p></div>
+      <div class="card-feature-light">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-lg)">
+          <div class="form-group"><label>OpenAI API Key</label><input class="text-input" id="key_OPENAI_API_KEY" type="password" placeholder="sk-..." autocomplete="off"></div>
+          <div class="form-group"><label>LLM Provider</label><select class="text-input" id="key_LLM_PROVIDER"><option value="openai">openai</option><option value="deepseek">deepseek</option></select></div>
+          <div class="form-group"><label>LLM Model</label><input class="text-input" id="key_LLM_MODEL" type="text" placeholder="gpt-4o" autocomplete="off"></div>
+          <div class="form-group"><label>LLM Base URL（可选）</label><input class="text-input" id="key_LLM_BASE_URL" type="text" placeholder="自定义 API 端点" autocomplete="off"></div>
+          <div class="form-group"><label>Stability AI API Key</label><input class="text-input" id="key_STABILITY_API_KEY" type="password" placeholder="sk-..." autocomplete="off"></div>
+          <div class="form-group"><label>智谱 Zhipu API Key</label><input class="text-input" id="key_ZHIPU_API_KEY" type="password" placeholder="你的智谱 Key" autocomplete="off"></div>
+          <div class="form-group"><label>RunningHub API Key</label><input class="text-input" id="key_RUNNINGHUB_API_KEY" type="password" placeholder="RunningHub Key" autocomplete="off"></div>
+          <div class="form-group"><label>豆包 Doubao API Key</label><input class="text-input" id="key_DOUBAO_API_KEY" type="password" placeholder="火山引擎 Ark Key" autocomplete="off"></div>
+          <div class="form-group"><label>ModelScope Token</label><input class="text-input" id="key_MODELSCOPE_API_KEY" type="password" placeholder="ModelScope Access Token" autocomplete="off"></div>
+          <div class="form-group"><label>Pollinations API Key</label><input class="text-input" id="key_POLLINATIONS_API_KEY" type="password" placeholder="pollinations.ai Token" autocomplete="off"></div>
+          <div class="form-group"><label>DashScope API Key（阿里 WAN）</label><input class="text-input" id="key_DASHSCOPE_API_KEY" type="password" placeholder="阿里云百炼 Key" autocomplete="off"></div>
+          <div class="form-group"><label>混元 API Key（腾讯）</label><input class="text-input" id="key_HUNYUAN_API_KEY" type="password" placeholder="腾讯混元 Key" autocomplete="off"></div>
+          <div class="form-group"><label>讯飞星火 APP ID</label><input class="text-input" id="key_SPARK_APP_ID" type="text" placeholder="Spark APPID" autocomplete="off"></div>
+          <div class="form-group"><label>讯飞星火 API Key</label><input class="text-input" id="key_SPARK_API_KEY" type="password" placeholder="Spark API Key" autocomplete="off"></div>
+          <div class="form-group"><label>讯飞星火 API Secret</label><input class="text-input" id="key_SPARK_API_SECRET" type="password" placeholder="Spark API Secret" autocomplete="off"></div>
+          <div class="form-group"><label>千帆 API Key（百度）</label><input class="text-input" id="key_QIANFAN_API_KEY" type="password" placeholder="bce-v3/ALTAK-..." autocomplete="off"></div>
+          <div class="form-group"><label>通用 Image Gen Key（兜底）</label><input class="text-input" id="key_IMAGE_GEN_API_KEY" type="password" placeholder="兜底 API Key" autocomplete="off"></div>
+        </div>
+        <div style="margin-top:var(--space-xl);display:flex;gap:12px;align-items:center">
+          <button class="btn-primary-dark" onclick="saveKeys()">保存设置</button>
+          <button class="btn-secondary-outline" onclick="loadKeys()">刷新</button>
+          <span id="keysStatus" class="caption"></span>
+        </div>
+        <div class="hint" style="margin-top:var(--space-md)">保存的 Key 存储在本地 SQLite 数据库中，仅用于调用对应 API。Key 显示为掩码。</div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ════════════ Closing Teal Band ════════════ -->
+<section class="section" style="padding-top:0" id="tealBandSection">
+  <div class="container">
+    <div class="card-teal-band" id="tealBand">
+      <h3 id="tealTitle">不满意结果？调整提示词再试一次。</h3>
+      <span id="tealBtnWrap"><button class="btn-on-teal" id="tealBtn" onclick="document.getElementById('promptInput').focus();document.getElementById('promptInput').scrollIntoView({behavior:'smooth'})">优化提示词</button></span>
+    </div>
+  </div>
+</section>
+
+<script>
+/* ════════════ Navigation ════════════ */
+function toggleNav() { document.getElementById('navLinks').classList.toggle('open'); }
+function switchMode(mode) {
+  document.querySelectorAll('.nav-link').forEach(function(l){l.classList.remove('active')});
+  var t = document.querySelector('.nav-link[data-mode="'+mode+'"]');
+  if (t) t.classList.add('active');
+  document.querySelectorAll('.section-page').forEach(function(s){s.classList.remove('active')});
+  document.getElementById('section-'+mode).classList.add('active');
+  document.getElementById('topNav').className = 'top-nav dark';
+  var heroContent = {
+    agent: {badge:'AI 驱动的文生图流水线',title:'文生图智能体',subtitle:'提示词增强、智能路由、多模型并行生成、自动评分优化 — 一站式出图。',btn:'<button class="btn-on-dark-pill" onclick="generateAgent()">开始生成</button>'},
+    direct: {badge:'20+ 模型直接生成',title:'自由模型生成',subtitle:'自选模型，跳过流水线直接出图 — 快速尝试不同模型的风格与质量。',btn:'<button class="btn-on-dark-pill" onclick="document.getElementById(\'promptDirect\').focus();document.getElementById(\'promptDirect\').scrollIntoView({behavior:\'smooth\'})">选择模型</button>'},
+    stats: {badge:'用量统计',title:'模型使用统计',subtitle:'每日各模型生图用量一览，数据实时更新。',btn:'<button class="btn-on-dark-pill" onclick="fetchStats()">刷新数据</button>'},
+    gallery: {badge:'生成历史',title:'素材库',subtitle:'浏览历史记录，按模型筛选，一键导出打包下载。',btn:'<button class="btn-on-dark-pill" onclick="initGallery()">浏览素材</button>'},
+    settings: {badge:'全局配置',title:'API Key 设置',subtitle:'统一管理各模型的 API Key，保存后立即生效，存储在本地数据库。',btn:'<button class="btn-on-dark-pill" onclick="loadKeys()">加载设置</button>'}
+  };
+  var hc = heroContent[mode] || heroContent.agent;
+  document.getElementById('heroBadge').textContent = hc.badge;
+  document.getElementById('heroTitle').textContent = hc.title;
+  document.getElementById('heroSubtitle').textContent = hc.subtitle;
+  document.getElementById('heroActions').innerHTML = hc.btn;
+  var tealContent = {
+    agent: {title:'不满意结果？调整提示词再试一次。',btn:'<button class="btn-on-teal" onclick="document.getElementById(\'promptInput\').focus();document.getElementById(\'promptInput\').scrollIntoView({behavior:\'smooth\'})">优化提示词</button>'},
+    direct: {title:'想用完整流水线？切换到 Agent 模式体验自动评分优化。',btn:'<button class="btn-on-teal" onclick="switchMode(\'agent\')">切换 Agent 模式</button>'},
+    stats: {title:'查看素材库？按模型筛选并一键导出生成历史。',btn:'<button class="btn-on-teal" onclick="switchMode(\'gallery\')">打开素材库</button>'},
+    gallery: {title:'回到 Agent 流水线？体验完整的智能体出图流程。',btn:'<button class="btn-on-teal" onclick="switchMode(\'agent\')">切换 Agent 模式</button>'},
+    settings: {title:'设置完成？回到 Agent 流水线开始生成图片。',btn:'<button class="btn-on-teal" onclick="switchMode(\'agent\')">切换 Agent 模式</button>'}
+  };
+  var tc = tealContent[mode] || tealContent.agent;
+  document.getElementById('tealTitle').textContent = tc.title;
+  document.getElementById('tealBtnWrap').innerHTML = tc.btn;
+  var tp = document.getElementById('taskInputPanel'), th = document.getElementById('taskHistory'), thBtn = document.getElementById('toggleHistory');
+  thBtn.style.display = ''; fetchTasks(); startTaskPolling();
+  if (mode==='stats') fetchStats();
+  document.getElementById('navLinks').classList.remove('open');
+}
+function triggerGenerate() {
+  var m = document.querySelector('.nav-link.active').dataset.mode;
+  if (m==='agent') generateAgent(); else if (m==='direct') generateDirect();
+}
+function toggleTaskPanel() { document.getElementById('taskInputPanel').classList.toggle('open'); }
+function toggleHistory() { document.getElementById('taskHistory').classList.toggle('open'); }
+
+/* ════════════ Model resolution ════════════ */
+var MODEL_MAX_RES = {
+  'sdxl':1536,'flux':1536,'sdxl-anime':1536,'face3d':1024,'glm-image':2048,'cogview-4':2048,'cogview-3-flash':2048,
+  'flux2-klein':1024,'stable-ultra':1024,'doubao-seedream':2048,
+  'modelscope':2048,'modelscope-zimage':2048,'modelscope-nexus':2048,'modelscope-flux':2048,'modelscope-sdxl':2048,
+  'pollinations-sana':2048,'pollinations-gptimage':2048,'pollinations-gptimage2':2048,'pollinations-seedream5':2048,
+  'pollinations-nanobanana':2048,'pollinations-kontext':2048,'pollinations-grok':2048,'spark-tti':2048,'qianfan-qwen':2048,
+  'wan2.6-image':2048,'hy-image-v3.0':2048
+};
+var ALL_RESOLUTIONS = [512,768,1024,1536];
+function onModelChange(tab) {
+  var mid = tab==='Direct'?'modelSelect':'modelSelect', rid = tab==='Direct'?'resolutionDirect':'resolutionDirect';
+  var model = document.getElementById(mid).value, max = MODEL_MAX_RES[model]||1536;
+  var sel = document.getElementById(rid), cur = parseInt(sel.value)||1024;
+  var opts = ALL_RESOLUTIONS.filter(function(r){return r<=max;});
+  sel.innerHTML = opts.map(function(r){return '<option value="'+r+'"'+(r===Math.min(cur,max)?' selected':'')+'>'+r+'px</option>';}).join('');
+  sel.disabled = opts.length<=1;
+}
+var _scoringEnabled = true;
+function toggleScoring() {
+  _scoringEnabled = !_scoringEnabled;
+  var btn = document.getElementById('scoringBtn');
+  var opts = document.getElementById('scoringOptions');
+  if (_scoringEnabled) {
+    btn.className = 'pill-tab active';
+    btn.textContent = '已开启';
+    opts.style.display = 'flex';
+  } else {
+    btn.className = 'pill-tab';
+    btn.textContent = '已关闭';
+    opts.style.display = 'none';
+  }
+}
+
+/* ════════════ Utilities ════════════ */
+function getDims(rid,rsz){
+  var wh=document.getElementById(rid).value.split(':').map(Number),base=parseInt(document.getElementById(rsz).value),r=wh[0]/wh[1];
+  return r>=1?{width:Math.round(base*r/8)*8,height:base}:{width:base,height:Math.round(base/r/8)*8};
+}
+function setStatus(pre,state,text){document.getElementById('statusDot'+pre).className='status-dot '+state;document.getElementById('statusText'+pre).textContent=text;}
+function imgGrid(images){return(images||[]).map(function(img,i){return'<div class="image-card"><img src="'+img.url+'" alt="图'+(i+1)+'" loading="lazy"><div class="meta"><span>'+escHtml(img.model||'')+' · 种子 '+(img.seed!=null?img.seed:'—')+' · '+img.width+'×'+img.height+'</span></div></div>';}).join('');}
+function escHtml(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
+function escAttr(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+/* ════════════ Task Queue ════════════ */
+var taskPollingInterval=null,activeTaskId=null,allTasks=[];
+function startTaskPolling(){if(taskPollingInterval)return;fetchTasks();taskPollingInterval=setInterval(fetchTasks,2000);}
+function stopTaskPolling(){if(taskPollingInterval){clearInterval(taskPollingInterval);taskPollingInterval=null;}}
+async function fetchTasks(){try{var r=await fetch('/api/v1/tasks');if(!r.ok)return;allTasks=await r.json();renderTaskSidebar(allTasks);}catch(e){}}
+function addPromptSlot(){
+  var active=document.querySelector('.nav-link.active'),mode=active?active.dataset.mode:'agent';
+  var model='',num=4,badgeText='Agent 全流程',badgeClass='badge-tag-indigo',infoText='评分迭代 · 自动优化';
+  if(mode==='direct'){
+    model=document.getElementById('modelSelect').value;num=parseInt(document.getElementById('numImagesDirect').value)||4;
+    badgeText='自由模型';badgeClass='badge-tag-teal';infoText=model+' · '+num+'张';
+  }
+  var slots=document.getElementById('taskSlots'),div=document.createElement('div');
+  div.className='task-slot';
+  div.setAttribute('data-source',mode);
+  if(model)div.setAttribute('data-model',model);
+  div.setAttribute('data-num',num);
+  div.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span class="badge-tag '+badgeClass+'">'+badgeText+'</span><span class="slot-info">'+infoText+'</span></div><textarea class="task-slot-input" placeholder="输入 Prompt..." rows="2"></textarea><button class="btn-icon" onclick="this.parentElement.remove()" title="删除" style="position:absolute;top:8px;right:8px">&times;</button>';
+  slots.appendChild(div);div.querySelector('textarea').focus();
+}
+async function submitAllPrompts(){
+  var slots=document.querySelectorAll('#taskSlots .task-slot'),items=[];
+  slots.forEach(function(slot){
+    var ta=slot.querySelector('.task-slot-input'),v=(ta.value||'').trim();if(!v)return;
+    var source=slot.getAttribute('data-source')||'agent',model=slot.getAttribute('data-model')||'';
+    var num=parseInt(slot.getAttribute('data-num'))||4;
+    items.push({prompt:v,max_retries:parseInt(document.getElementById('maxRetriesInput').value)||3,pass_threshold:parseFloat(document.getElementById('thresholdInput').value)||0.8,enable_scoring:_scoringEnabled,source:source,model:model,num_images:num});
+  });
+  if(!items.length)return;
+  var dims=getDims('aspectRatio','resolution');
+  var btn=document.getElementById('submitQueueBtn');btn.disabled=true;btn.textContent='提交中...';
+  try{var r=await fetch('/api/v1/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tasks:items,width:dims.width,height:dims.height})});if(r.ok){slots.forEach(function(slot){slot.remove();});startTaskPolling();await fetchTasks();}}catch(e){}
+  btn.disabled=false;btn.textContent='提交全部到后台';
+}
+document.addEventListener('DOMContentLoaded',function(){document.getElementById('taskSlots').addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey&&e.target.classList.contains('task-slot-input')){e.preventDefault();addPromptSlot();}});});
+function renderTaskSidebar(tasks){
+  var history=document.getElementById('taskHistory'),list=document.getElementById('taskList'),countEl=document.getElementById('taskCount'),thBtn=document.getElementById('toggleHistory');
+  if(!tasks||!tasks.length){history.classList.remove('open');thBtn.style.display='none';countEl.textContent='0 个任务';list.innerHTML='';stopTaskPolling();return;}
+  thBtn.style.display='';countEl.textContent=tasks.length+' 个任务';
+  var hasActive=tasks.some(function(t){return t.status==='pending'||t.status==='running';});
+  if(!hasActive)stopTaskPolling();else startTaskPolling();
+  list.innerHTML=tasks.map(function(t){
+    var r=t.result,bs=t.status==='completed'&&r?r.best_score:null;
+    var sc=bs!=null?(bs>=0.8?'high':bs>=0.6?'mid':'low'):'',bi=t.status==='completed'&&r?r.best_image:null;
+    var sel=t.task_id===activeTaskId?' selected':'',m=t.status==='completed'&&r?r.router_decision:null;
+    var src=t.source||'agent',srcLabel=src==='direct'?'自由':src==='local'?'本地':'Agent';
+    return'<div class="task-item'+sel+'" onclick="viewTask(\''+t.task_id+'\')">'
+      +'<span class="task-status-dot '+t.status+'"></span><div class="task-item-body">'
+      +'<div class="task-item-prompt" title="'+escHtml(t.prompt)+'">'+escHtml(t.prompt)+'</div>'
+      +'<div class="task-item-meta">'
+      +'<span class="badge-tag badge-tag-'+(srcLabel==='Agent'?'indigo':srcLabel==='自由'?'teal':'warm')+'" style="margin-right:6px">'+srcLabel+'</span>'
+      +(t.status==='completed'&&r
+        ?(bs!=null?'<span class="task-item-score score-'+sc+'">'+bs.toFixed(3)+'</span> · '+(r.total_rounds||1)+'轮 · '+(m?m.primary_model:(t.model||'—')):'<span>'+((m&&m.primary_model)||(t.model)||'—')+' · '+((r.all_images||[]).length||0)+'张</span>')
+        :t.status==='failed'
+          ?'<span style="color:var(--color-error)">'+escHtml(t.error||'失败')+'</span>'
+          :t.status==='running'
+            ?'<span style="color:var(--color-warning)">生成中...</span>'
+            :'<span>等待中...</span>')
+      +'</div>'
+      +'</div>'+(bi?'<img class="task-item-thumb" src="'+bi.url+'" alt="thumb" loading="lazy">':'')
+      +((t.status==='completed'||t.status==='failed')?'<span class="btn-icon task-item-del" onclick="event.stopPropagation();deleteTask(\''+t.task_id+'\')" style="align-self:center;opacity:0;transition:opacity 0.15s">&times;</span>':'')
+      +'</div>';
+  }).join('');
+}
+async function viewTask(taskId){
+  activeTaskId=taskId;var task=allTasks.find(function(t){return t.task_id===taskId;});
+  if(task&&task.status==='completed'&&task.result){showTaskResult(task.result);renderTaskSidebar(allTasks);return;}
+  if(task&&task.status==='failed'){document.getElementById('resultsAgent').style.display='block';document.getElementById('logContainer').innerHTML='';addLog('任务失败：'+(task.error||'未知错误'),'error');setStatus('Agent','error','任务失败');renderTaskSidebar(allTasks);return;}
+  try{var r=await fetch('/api/v1/tasks/'+taskId);if(!r.ok)return;var full=await r.json();if(full.status==='completed'&&full.result)showTaskResult(full.result);else if(full.status==='failed'){document.getElementById('resultsAgent').style.display='block';document.getElementById('logContainer').innerHTML='';addLog('任务失败：'+(full.error||'未知错误'),'error');setStatus('Agent','error','任务失败');}allTasks=allTasks.map(function(t){return t.task_id===taskId?full:t;});renderTaskSidebar(allTasks);}catch(e){}
+}
+function showTaskResult(d){document.getElementById('resultsAgent').style.display='block';document.getElementById('logContainer').innerHTML='';var preview=(d.enhanced_prompt||d.user_prompt||'').substring(0,80);addLog('查看任务结果：'+preview,'node');renderAgent(d);setStatus('Agent','done','任务结果'+(d.all_scores&&d.all_scores.length?' · 评分 '+((d.best_score||0).toFixed(3)):''));}
+async function deleteTask(taskId){try{await fetch('/api/v1/tasks/'+taskId,{method:'DELETE'});if(activeTaskId===taskId)activeTaskId=null;await fetchTasks();}catch(e){}}
+
+/* ════════════ Agent ════════════ */
+function addLog(msg,cls){var d=document.createElement('div');d.className='log-line '+(cls||'');d.textContent=new Date().toLocaleTimeString('zh-CN')+'  '+msg;document.getElementById('logContainer').appendChild(d);document.getElementById('logContainer').scrollTop=document.getElementById('logContainer').scrollHeight;}
+async function generateAgent(){
+  var p=document.getElementById('promptInput').value.trim();if(!p)return;
+  var th=parseFloat(document.getElementById('thresholdInput').value)||0.8,mr=parseInt(document.getElementById('maxRetriesInput').value)||3;
+  var dims=getDims('aspectRatio','resolution'),es=_scoringEnabled;
+  var btn=document.getElementById('generateBtn');document.getElementById('logContainer').innerHTML='';document.getElementById('resultsAgent').style.display='block';
+  btn.disabled=true;setStatus('Agent','running','正在生成...');addLog('启动流水线：'+p.substring(0,80)+(es?'':'（评分已关闭）'),'node');
+  try{
+    var t0=performance.now();
+    var r=await fetch('/api/v1/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:p,pass_threshold:th,max_retries:mr,width:dims.width,height:dims.height,enable_scoring:es})});
+    var d=await r.json(),el=(performance.now()-t0).toFixed(0);
+    if(r.ok){renderAgent(d);setStatus('Agent','done','完成 · '+el+'ms · '+d.total_rounds+' 轮');}else{setStatus('Agent','error','错误：'+(d.detail||''));addLog('失败：'+JSON.stringify(d),'error');}
+  }catch(e){setStatus('Agent','error','连接失败');addLog('网络错误：'+e.message,'error');}
+  btn.disabled=false;
+}
+function renderAgent(d){
+  var imgs=d.all_images||[],modelAlive={},isDirect=!(d.router_decision&&d.router_decision.category);
+  imgs.forEach(function(img){
+    var alive=img.url&&img.url.indexOf('placehold.co')===-1;
+    modelAlive[img.model]=modelAlive[img.model]||alive;
+  });
+  document.getElementById('modelStatus').innerHTML=Object.keys(modelAlive).map(function(m){
+    var ok=modelAlive[m];
+    return '<div style="display:flex;align-items:center;gap:6px"><span class="status-dot '+(ok?'done':'error')+'"></span><span style="font-size:14px;font-weight:540">'+escHtml(m)+'</span><span style="font-size:12px;color:'+(ok?'var(--color-success)':'var(--color-error)')+'">'+(ok?'已连通':'未连通')+'</span></div>';
+  }).join('');
+  var rd=d.router_decision||{},cm={realistic:'写实',anime:'二次元','video-frame':'视频帧',face3d:'3D人脸',general:'通用'};
+  if(isDirect){
+    document.getElementById('routeInfo').innerHTML='<div class="route-chip"><strong>模式：</strong>直接生成</div><div class="route-chip"><strong>模型：</strong>'+(rd.primary_model||'—')+'</div>';
+    addLog('模型：'+(rd.primary_model||'—'),'node');
+  }else{
+    document.getElementById('routeInfo').innerHTML='<div class="route-chip"><strong>分类：</strong>'+(cm[rd.category]||rd.category||'—')+'</div><div class="route-chip"><strong>主模型：</strong>'+(rd.primary_model||'—')+'</div><div class="route-chip"><strong>备选：</strong>'+(rd.fallback_models||[]).join(',')+'</div><div class="route-chip"><strong>风格：</strong>'+(rd.style_tags||[]).join(',')+'</div>'+(d.model_fallback_used?'<div class="route-chip" style="border-color:var(--color-warning)"><strong>容灾：</strong>'+d.model_fallback_used+'</div>':'');
+    addLog('增强：'+(d.enhanced_prompt||'').substring(0,100),'');addLog('路由：'+(cm[rd.category]||rd.category||'—')+' → '+(rd.primary_model||'—'),'node');
+    if(d.model_fallback_used)addLog('容灾切换：'+d.model_fallback_used,'retry');
+  }
+  var bu=d.best_image?.url;
+  document.getElementById('roundLabel').textContent=(isDirect?'':'（第'+d.total_rounds+'轮）');
+  document.getElementById('imageGridAgent').innerHTML=imgs.map(function(img,i){
+    var best=img.url===bu,s=d.all_scores?.find(function(x){return x.image_url===img.url;}),fs=s?s.final_score:0;
+    return'<div class="image-card'+(best?' best':'')+'"><img src="'+img.url+'" alt="img'+(i+1)+'" loading="lazy"><div class="meta"><span class="score '+(fs>=0.8?'score-high':fs>=0.6?'score-mid':'score-low')+'">'+fs.toFixed(3)+'</span><span>'+img.model+' · 种子 '+(img.seed!=null?img.seed:'—')+' · '+img.width+'×'+img.height+'</span>'+(best?'<span class="badge-best" style="margin-top:2px">最优</span>':'')+'</div></div>';
+  }).join('');
+  if(d.best_score!=null&&!isDirect){document.getElementById('bestBadge').style.display='inline-flex';document.getElementById('bestScoreLabel').textContent=d.best_score.toFixed(3);}else{document.getElementById('bestBadge').style.display='none';}
+  var sc=d.all_scores||[];
+  if(sc.length){
+    document.getElementById('scoreBreakdown').innerHTML=sc.map(function(s,i){
+      return'<div class="score-item"><div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="font-size:14px;font-weight:600;color:var(--color-primary)">图片 #'+(i+1)+'</span><span style="font-size:14px;font-weight:700;color:'+(s.final_score>=0.8?'var(--color-success)':s.final_score>=0.6?'var(--color-warning)':'var(--color-error)')+'">'+s.final_score.toFixed(3)+'</span></div><div style="font-size:12px;color:var(--color-ink-mute);margin-bottom:6px;">CLIP：'+s.clip_score.toFixed(3)+' · 美学：'+s.aesthetic_score.toFixed(3)+' · GPT-V：'+s.gpt_vision_score.toFixed(3)+'</div><div class="score-bar-row"><div class="score-bar" style="flex:4"><div class="score-bar-fill clip" style="width:'+(s.clip_score*100)+'%"></div></div><span class="micro" style="width:32px">CLIP</span><div class="score-bar" style="flex:3"><div class="score-bar-fill aesthetic" style="width:'+(s.aesthetic_score*100)+'%"></div></div><span class="micro" style="width:55px">美学</span><div class="score-bar" style="flex:3"><div class="score-bar-fill gpt" style="width:'+(s.gpt_vision_score*100)+'%"></div></div><span class="micro" style="width:28px">GPT</span></div><div style="font-size:11px;color:var(--color-ink-mute);margin-top:4px;">'+(s.gpt_vision_reason||'无')+'</div></div>';
+    }).join('');
+  }else{
+    document.getElementById('scoreBreakdown').innerHTML='<div style="color:var(--color-ink-mute);font-size:14px">直接生成模式，无评分数据</div>';
+  }
+  addLog('生成'+imgs.length+'张图','');
+  if(!isDirect){addLog('最高分：'+(d.best_score||0).toFixed(3)+'（及格线：'+(d.pass_threshold||0.8).toFixed(2)+'）','score');}
+  if(d.total_rounds>1)addLog('共重试'+d.total_rounds+'轮 · 最优在第'+d.best_round+'轮','retry');
+  if((d.errors||[]).length)addLog('错误：'+d.errors.join('；'),'error');
+}
+
+/* ════════════ Direct ════════════ */
+async function generateDirect(){
+  var p=document.getElementById('promptDirect').value.trim();if(!p)return;
+  var model=document.getElementById('modelSelect').value,dims=getDims('aspectRatioDirect','resolutionDirect'),n=parseInt(document.getElementById('numImagesDirect').value)||4,enhance=document.getElementById('enhanceDirect').value==='1';
+  var btn=document.getElementById('generateBtnDirect');btn.disabled=true;setStatus('Direct','running','调用 '+model+' ...');
+  try{var t0=performance.now();var r=await fetch('/api/v1/generate/direct',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:p,model:model,width:dims.width,height:dims.height,num_images:n,enhance_prompt:enhance})});var d=await r.json(),el=(performance.now()-t0).toFixed(0);if(r.ok){document.getElementById('resultsDirect').style.display='block';document.getElementById('imageGridDirect').innerHTML=imgGrid(d.images);document.getElementById('directMeta').textContent=d.model_used+' · '+el+'ms';setStatus('Direct','done','完成 · '+el+'ms · '+d.images.length+'张');}else{setStatus('Direct','error','错误：'+(d.detail||''));}}catch(e){setStatus('Direct','error','连接失败');}
+  btn.disabled=false;
+}
+
+/* ════════════ Stats ════════════ */
+async function fetchStats(){try{var r=await fetch('/api/v1/stats/daily');if(!r.ok)return;renderStats(await r.json());}catch(e){}}
+function renderStats(d){
+  var s=d.summary||{};document.getElementById('statsSummary').textContent='共 '+(s.total_images||0)+' 张 · '+(s.total_days||0)+' 天'+(s.top_model?' · 最常用：'+s.top_model:'');
+  var tbody=document.getElementById('statsTableBody'),empty=document.getElementById('statsEmpty'),daily=d.daily||[];
+  if(!daily.length){empty.style.display='block';tbody.innerHTML='';return;}empty.style.display='none';
+  var rows='';daily.forEach(function(day){var models=day.models||{},names=Object.keys(models).sort(function(a,b){return models[b]-models[a];});names.forEach(function(m,i){rows+='<tr><td style="padding:10px 14px;'+(i===0?'font-weight:600;':'color:var(--color-ink-mute);')+'">'+(i===0?day.date:'')+'</td><td style="padding:10px 14px;"><span class="model-chip">'+escHtml(m)+'</span></td><td style="padding:10px 14px;text-align:right;">'+models[m]+'</td></tr>';});});tbody.innerHTML=rows;
+}
+
+/* ════════════ Gallery ════════════ */
+var galleryData=[],galleryTotal=0,galleryCurrentPage=1,gallerySelectMode=false,selectedIds=new Set();
+function initGallery(){galleryCurrentPage=1;gallerySelectMode=false;selectedIds.clear();updateSelectUI();fetchGenerations();
+  fetch('/api/v1/generations?page_size=1').then(function(r){return r.json();}).then(function(d){var fc=d.filters||{},ms=document.getElementById('galleryModelFilter'),cs=document.getElementById('galleryCategoryFilter');ms.innerHTML='<option value="">全部</option>';cs.innerHTML='<option value="">全部</option>';var models=fc.models||{};Object.keys(models).sort(function(a,b){return models[b]-models[a];}).forEach(function(m){ms.innerHTML+='<option value="'+escHtml(m)+'">'+escHtml(m)+' ('+models[m]+')</option>';});var cats=fc.categories||{};Object.keys(cats).sort(function(a,b){return cats[b]-cats[a];}).forEach(function(c){cs.innerHTML+='<option value="'+escHtml(c)+'">'+escHtml(c)+' ('+cats[c]+')</option>';});}).catch(function(){});}
+async function fetchGenerations(){var m=document.getElementById('galleryModelFilter').value,c=document.getElementById('galleryCategoryFilter').value,s=document.getElementById('gallerySourceFilter').value,params=new URLSearchParams({page:galleryCurrentPage,page_size:20});if(m)params.set('model',m);if(c)params.set('category',c);if(s)params.set('source',s);try{var r=await fetch('/api/v1/generations?'+params.toString());if(!r.ok)return;var d=await r.json();galleryData=d.items||[];galleryTotal=d.total||0;renderGallery();}catch(e){}}
+function renderGallery(){
+  var grid=document.getElementById('galleryGrid'),info=document.getElementById('galleryPageInfo'),prev=document.getElementById('galleryPrev'),next=document.getElementById('galleryNext'),countEl=document.getElementById('galleryCount'),maxPage=Math.ceil(galleryTotal/20);
+  info.textContent=galleryCurrentPage+' / '+(maxPage||1);prev.disabled=galleryCurrentPage<=1;next.disabled=galleryCurrentPage>=maxPage;countEl.textContent='共 '+galleryTotal+' 张';
+  if(!galleryData.length){grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:var(--space-huge);color:var(--color-ink-mute);">暂无生成记录</div>';return;}
+  grid.innerHTML=galleryData.map(function(rec){var sel=selectedIds.has(rec.id);return'<div class="image-card'+(gallerySelectMode?(sel?' selected':''):'')+'" style="position:relative;cursor:pointer;" onclick="clickGalleryImage('+rec.id+')"><button class="btn-icon" onclick="event.stopPropagation();deleteGeneration('+rec.id+')" title="删除" style="position:absolute;top:6px;right:6px;z-index:2;background:rgba(0,0,0,0.5);color:#fff;width:24px;height:24px;font-size:14px;opacity:0;transition:opacity 0.15s">&times;</button><img src="'+escAttr(rec.image_base64||'')+'" alt="img" loading="lazy"><div class="meta"><span style="font-weight:600;color:var(--color-ink);">'+escHtml((rec.prompt||'').substring(0,40))+'</span><span>'+escHtml(rec.model||'')+' · '+(rec.created_at||'').substring(0,10)+(rec.best_score!=null?' · <span style="color:var(--color-success);font-weight:600;">'+rec.best_score.toFixed(3)+'</span>':'')+(sel?'<span class="badge-tag badge-tag-indigo" style="margin-top:2px">已选</span>':'')+'</span></div></div>';}).join('');
+}
+function clickGalleryImage(id){if(gallerySelectMode){if(selectedIds.has(id))selectedIds.delete(id);else selectedIds.add(id);renderGallery();updateSelectUI();}}
+function toggleSelectMode(){gallerySelectMode=!gallerySelectMode;if(!gallerySelectMode)selectedIds.clear();updateSelectUI();renderGallery();}
+function selectAllVisible(){galleryData.forEach(function(r){selectedIds.add(r.id);});renderGallery();updateSelectUI();}
+function updateSelectUI(){document.getElementById('selectModeBtn').textContent=gallerySelectMode?'退出选择':'选择模式';document.getElementById('selectAllBtn').style.display=gallerySelectMode?'':'none';document.getElementById('exportBtn').style.display=(gallerySelectMode&&selectedIds.size>0)?'':'none';if(gallerySelectMode){document.getElementById('exportBtn').textContent='导出 ('+selectedIds.size+')';document.getElementById('exportBtn').disabled=selectedIds.size===0;}}
+function galleryPage(dir){galleryCurrentPage+=dir;if(galleryCurrentPage<1)galleryCurrentPage=1;fetchGenerations();}
+async function deleteGeneration(id){
+  if(!confirm('确认删除这张图片？'))return;
+  try{await fetch('/api/v1/generations/'+id,{method:'DELETE'});selectedIds.delete(id);fetchGenerations();}catch(e){}
+}
+function exportSelected(){if(!selectedIds.size)return;var a=document.createElement('a');a.href='/api/v1/generations/export?ids='+Array.from(selectedIds).join(',');a.download='';document.body.appendChild(a);a.click();document.body.removeChild(a);}
+
+/* ════════════ Settings / API Keys ════════════ */
+var ALL_KEYS=[
+  'OPENAI_API_KEY','LLM_PROVIDER','LLM_MODEL','LLM_BASE_URL','IMAGE_GEN_API_KEY',
+  'STABILITY_API_KEY','ZHIPU_API_KEY','RUNNINGHUB_API_KEY','DOUBAO_API_KEY',
+  'MODELSCOPE_API_KEY','POLLINATIONS_API_KEY','DASHSCOPE_API_KEY','HUNYUAN_API_KEY',
+  'SPARK_APP_ID','SPARK_API_KEY','SPARK_API_SECRET',
+  'QIANFAN_API_KEY'
+];
+async function loadKeys(){
+  try{
+    var r=await fetch('/api/v1/settings/keys');
+    if(!r.ok)return;
+    var d=await r.json(),keys=d.keys||{};
+    ALL_KEYS.forEach(function(k){
+      var el=document.getElementById('key_'+k);
+      if(el && keys[k])el.value=keys[k];
+      else if(el && el.type!=='select')el.value='';
+    });
+    document.getElementById('keysStatus').textContent='已加载（掩码显示）';
+  }catch(e){document.getElementById('keysStatus').textContent='加载失败';}
+}
+async function saveKeys(){
+  var payload={};
+  ALL_KEYS.forEach(function(k){
+    var el=document.getElementById('key_'+k);
+    if(el && el.value.trim())payload[k]=el.value.trim();
+  });
+  try{
+    var r=await fetch('/api/v1/settings/keys',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({keys:payload})});
+    if(r.ok){
+      document.getElementById('keysStatus').textContent='已保存 · 立即生效';
+      loadKeys();
+    }else{var d=await r.json();document.getElementById('keysStatus').textContent='保存失败：'+(d.detail||'');}
+  }catch(e){document.getElementById('keysStatus').textContent='网络错误';}
+}
+
+/* ════════════ Keyboard shortcuts ════════════ */
+document.querySelectorAll('textarea').forEach(function(ta){ta.addEventListener('keydown',function(e){if(e.key==='Enter'&&e.ctrlKey){triggerGenerate();}})});
+
+/* ════════════ Init ════════════ */
+(function init(){fetchTasks();startTaskPolling();})();
+</script>
+</body>
+</html>
